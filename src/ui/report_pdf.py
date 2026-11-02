@@ -37,7 +37,7 @@ STRINGS = {
         "rep_qual_err_1": "Wykryto problemy z jakością w", "rep_qual_err_2": "obrazach:", "rep_format_lbl": "Format:",
         "rep_fonts_title": "Spójność czcionek na obrazach", "rep_fonts_all_ok": "Brak wykrytych problemów ze spójnością czcionek na rysunkach.",
         "rep_fonts_err_1": "Wykryto problemy z czcionkami w", "rep_fonts_err_2": "elementach:",
-        "rep_img_skip_title": "Ocena jakości obrazów i czcionek", "rep_img_skip_desc": "Analiza została pominięta na życzenie użytkownika lub dokument nie zawiera grafik.",
+        "rep_img_failed": "Analiza rysunków nie powiodła się w całości: wyniki są niepełne. Szczegóły są w logu aplikacji.", "rep_img_skip_title": "Ocena jakości obrazów i czcionek", "rep_img_skip_desc": "Analiza została pominięta na życzenie użytkownika lub dokument nie zawiera grafik.",
         "rep_stats_title": "Analiza statystyczna struktury zdań", "rep_stats_desc": "Struktura gramatyczna i stylistyczna badanej pracy dyplomowej:",
         "rep_active_lbl": "Zdania w stronie czynnej", "rep_active_desc": "Zalecana forma wypowiedzi w tekstach naukowych podnosząca dynamikę wywodu.",
         "rep_passive_lbl": "Zdania w stronie biernej", "rep_passive_desc": "Stosowana przy opisie procedur badawczych oraz stanu wiedzy.",
@@ -68,7 +68,7 @@ STRINGS = {
         "rep_qual_err_1": "Quality issues detected in", "rep_qual_err_2": "images:", "rep_format_lbl": "Format:",
         "rep_fonts_title": "Font Consistency in Images", "rep_fonts_all_ok": "No font consistency issues detected in figures.",
         "rep_fonts_err_1": "Font issues detected in", "rep_fonts_err_2": "elements:",
-        "rep_img_skip_title": "Image Quality and Fonts Assessment", "rep_img_skip_desc": "Analysis skipped by user request or document contains no graphics.",
+        "rep_img_failed": "The figure analysis did not fully succeed: the results are incomplete. See the application log for details.", "rep_img_skip_title": "Image Quality and Fonts Assessment", "rep_img_skip_desc": "Analysis skipped by user request or document contains no graphics.",
         "rep_stats_title": "Sentence Structure Statistical Analysis", "rep_stats_desc": "Grammatical and stylistic structure of the analyzed thesis:",
         "rep_active_lbl": "Active voice sentences", "rep_active_desc": "Recommended form of expression in academic texts, enhancing narrative dynamics.",
         "rep_passive_lbl": "Passive voice sentences", "rep_passive_desc": "Used when describing research procedures and state of knowledge.",
@@ -529,14 +529,17 @@ def _content(w, s, data):
     if has_images:
         w.heading(s["rep_img_title"])
         bad = int(_number(img.get("bad_count", 0)))
-        rows = [w.r_text(f"{s['rep_img_total']}: {int(_number(img.get('total', 0)))}   |   "
+        rows = [w.r_note(s["rep_img_failed"], "bad"), w.r_gap(6)] if img.get("analysis_failed") else []
+        rows += [w.r_text(f"{s['rep_img_total']}: {int(_number(img.get('total', 0)))}   |   "
                          f"{s['rep_img_bad']}: {bad}   |   {s['rep_img_good']}: {int(_number(img.get('good_count', 0)))}",
                          10.5, True, C["danger"] if bad else C["success"], 0.0, 4)]
         raster = img.get("raster_numbers", img.get("image_raster", [])) or []
         if raster:
             rows += [w.r_gap(6), w.r_label(s["rep_raster_ident"], C["primary_dark"], 10, 6),
                      w.r_chips([f"{s['panel_fig_prefix']} {n}" for n in raster])]
-        details = img.get("details", []) or []
+        details = img.get("problem_details")
+        if details is None:     # a report saved by an older version lists every figure in "details"
+            details = [d for d in img.get("details", []) or [] if "Poprawny" not in str(d)]
         if details:
             rows += [w.r_gap(8), w.r_label(s["rep_img_details"], C["text"], 10.5, 5)]
             rows += w.r_bullets(details, 10, C["text"], C["danger_dot"])
@@ -564,13 +567,14 @@ def _content(w, s, data):
             for err in fonts:
                 if isinstance(err, dict):
                     rows += w.r_figure(str(err.get("rysunek", s["unknown_fig"])), None,
-                                       [str(b) for b in err.get("errors", err.get("powody_odrzucenia", [str(err)]))])
+                                       [str(b) for b in err.get("errors", err.get("powody_odrzucenia", [err.get("blad", str(err))]))])
                 else:
                     rows += w.r_bullets([str(err)], 9.8, C["text3"], C["danger_dot"])
             w.card(rows)
     else:
         w.heading(s["rep_img_skip_title"])
-        w.card([w.r_note(s["rep_img_skip_desc"], "off")])
+        w.card([w.r_note(s["rep_img_failed"] if img.get("analysis_failed") else s["rep_img_skip_desc"],
+                         "bad" if img.get("analysis_failed") else "off")])
 
     # ---- sentence statistics
     w.heading(s["rep_stats_title"], s["rep_stats_desc"] if stats else None)
