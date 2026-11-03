@@ -44,6 +44,8 @@ GOAL_FRAGMENT_CHARS = 9000          # how much of the end of the thesis the goal
 PURPOSE_TOKENS = 70
 SECTION_TOKENS = 35                 # one summary (most end before their limit of 64)
 SECTION_PROMPT_TOKENS = 400
+REVIEWED_SECTIONS = 0.5              # share of the sections the text model checks for being on topic
+REVIEW_TOKENS = 80
 FIGURE_TOKENS = 70                  # reading a figure, its yes/no checks and comparing it with the text
 GOAL_TOKENS = (100, 0.003)          # base + per character: a longer thesis gets a longer reasoning
 SOTA_TOKENS = (120, 0.03)           # base + per character: every part of the chapter is checked against 3 rules
@@ -58,7 +60,7 @@ STAGE_VALUES = (("purpose", 55), ("goal", 62), ("summaries", 70), ("images", 80)
 HISTORY_LIMIT = 60
 # raise it whenever raw_estimate() changes: real/predicted ratios measured against an older model would distort the
 # calibration, so only the runs recorded with the same model version are used
-MODEL_VERSION = 3
+MODEL_VERSION = 4
 
 
 @dataclass
@@ -190,7 +192,9 @@ def raw_estimate(doc, machine, use_llm, check_images, history=()):
         ("goal", work(min(doc.chars, GOAL_FRAGMENT_CHARS) * TOKENS_PER_CHAR, base + per_char * doc.chars)),
     ]
     if doc.sections:
-        stages.append(("summaries", work(doc.sections * SECTION_PROMPT_TOKENS, doc.sections * SECTION_TOKENS)))
+        # the stage lasts until the next one starts, so it also holds the review of the doubtful sections
+        summaries = work(doc.sections * SECTION_PROMPT_TOKENS, doc.sections * SECTION_TOKENS)
+        stages.append(("summaries", summaries + work(0, doc.sections * REVIEWED_SECTIONS * REVIEW_TOKENS)))
     if check_images and doc.figures:
         vision_load = VISION_GB * 1024 ** 3 / load
         stages.append(("images", VISION_LOADS * vision_load + gemma_load + doc.figures * FIGURE_TOKENS / gen))
