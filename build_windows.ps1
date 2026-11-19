@@ -62,7 +62,10 @@ function Build-Variant($name) {
         # "uv sync" is exact: packages that are not part of this variant (e.g. CUDA torch) are removed.
         $syncArgs = @("sync", "--frozen", "--no-dev")
         if ($name -eq "cpu") { $syncArgs += @("--extra", "cpu") }
-        if ($name -eq "gpu") { $syncArgs += @("--extra", "gpu"); $env:CMAKE_ARGS = "-DGGML_CUDA=on -DGGML_NATIVE=OFF -DCMAKE_CUDA_ARCHITECTURES=$(Get-CudaArchitectures)" }
+        # GGML_CUDA_NO_VMM: without it ggml-cuda.dll links nvcuda.dll (the NVIDIA driver) directly, so llama_cpp cannot
+        # even be imported on a computer without an NVIDIA driver - a build machine without a GPU (GitHub Actions)
+        # or a user who installed the gpu variant on another card. With it the driver is loaded at run time by cudart.
+        if ($name -eq "gpu") { $syncArgs += @("--extra", "gpu"); $env:CMAKE_ARGS = "-DGGML_CUDA=on -DGGML_CUDA_NO_VMM=ON -DGGML_NATIVE=OFF -DCMAKE_CUDA_ARCHITECTURES=$(Get-CudaArchitectures)" }
         try {
             Run "uv" $syncArgs
         } finally {
