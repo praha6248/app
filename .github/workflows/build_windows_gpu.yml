@@ -16,7 +16,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022   # VS 2022: CUDA 12.8 does not support the MSVC of VS 2026 (windows-latest)
     timeout-minutes: 350   # llama.cpp CUDA for ~8 architectures compiles for hours on a 4-core runner
 
     steps:
