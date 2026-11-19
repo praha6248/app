@@ -81,7 +81,9 @@ function Build-Variant($name) {
 
     if ($name -eq "gpu") {
         & $python -c "import sys, llama_cpp; sys.exit(0 if llama_cpp.llama_supports_gpu_offload() else 1)"
-        if ($LASTEXITCODE -ne 0) {
+        # without an NVIDIA card (GitHub Actions) there is no device to offload to; check_cuda_archs below still
+        # fails when ggml-cuda.dll is missing
+        if ($LASTEXITCODE -ne 0 -and (Get-Command nvidia-smi -ErrorAction SilentlyContinue)) {
             throw "llama-cpp-python w tym srodowisku jest zbudowany BEZ CUDA. Usun .venv-build-gpu, wykonaj 'uv cache clean llama-cpp-python' i uruchom ponownie."
         }
         $llamaLib = & $python -c "import llama_cpp, os; print(os.path.join(os.path.dirname(llama_cpp.__file__), 'lib'))"

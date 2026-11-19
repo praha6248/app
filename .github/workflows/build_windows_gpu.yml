@@ -5,6 +5,8 @@
 name: Build Windows GPU variant
 
 on:
+  push:
+    branches: [test/windows-gpu-ci]
   workflow_dispatch:
     inputs:
       tag:
