@@ -1,0 +1,33 @@
+# Temporary: builds the Windows base and cpu variants of a release on a GitHub runner.
+name: Build Windows base and cpu
+
+on:
+  push:
+    branches: [test/windows-release]
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [base, cpu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          .\build_windows.ps1 -Variant ${{ matrix.variant }}
+          Remove-Item DiplomaChecker-windows-${{ matrix.variant }}.zip -ErrorAction SilentlyContinue
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DiplomaChecker-windows-${{ matrix.variant }}
+          path: dist/${{ matrix.variant }}/DiplomaChecker
+          compression-level: 6
